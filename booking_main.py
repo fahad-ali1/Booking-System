@@ -1,4 +1,6 @@
 import sqlite3
+import re
+from datetime import datetime
 
 class BookingSystem:
     """
@@ -33,31 +35,51 @@ class BookingSystem:
         self.connect.execute(query)
         self.connect.commit()
 
+    def validate_name(self, name):
+        return bool(re.match("^[a-zA-Z]+$", name))
+
+    def validate_date(self, date):
+        return bool(re.match(r"\d{6}$", date))
+
     def make_booking(self, customer_name, date, service):
-        # Make booking with 3 values
+        if not self.validate_name(customer_name):
+            print("\n------------Invalid customer name. Please use letters only------------\n")
+            return
+        if not self.validate_date(date):
+            print("\n------------Invalid date format. Please use YYMMDD format------------\n")
+            return
+
+        # Add slashes to the date before inserting it into the database
+        formatted_date = f"{date[:2]}/{date[2:4]}/{date[4:]}"
         query = "INSERT INTO bookings (customer_name, date, service) VALUES (?, ?, ?)"
-        self.connect.execute(query, (customer_name, date, service))
+        self.connect.execute(query, (customer_name, formatted_date, service))
         self.connect.commit()
-        print("\n------------Booking successful!------------")
+        print("\n------------Booking successful!------------\n")
 
     def view_bookings(self):
         # View booking by id, name, date and service
         query = "SELECT id, customer_name, date, service FROM bookings"
         cursor = self.connect.execute(query)
         
-        row = cursor.fetchone()  
+        row = cursor.fetchone()
 
         # If nothing in row, then no bookings
         if row is None:
-            print("\n------------No bookings found------------")
+            print("\n------------No bookings found------------\n")
         else:
             # Go through each row
             while row:
-                print("ID:", row[0])
+                print("---------------------------------")
+                print("\nID:", row[0])
                 print("Customer:", row[1])
-                print("Date:", row[2])
+
+                # Convert date string to a datetime object and format date as "Month Day, Year"
+                date_object = datetime.strptime(row[2], "%y/%m/%d")
+                formatted_date = date_object.strftime("%B %d, %Y")  
+
+                print("Date:", formatted_date)
                 print("Service:", row[3])
-                print()
+                print("---------------------------------\n")
                 
                 row = cursor.fetchone() 
 
@@ -70,20 +92,18 @@ class BookingSystem:
         cursor.execute(query, (booking_id,))
         
         if cursor.rowcount == 0:
-            print("\n------------Booking not found. No changes made------------")
+            print("\n------------Booking not found. No changes made------------\n")
         else:
             self.connect.commit()
-            print("\n------------Booking removed successfully!------------")
+            print("\n------------Booking removed successfully!------------\n")
         cursor.close()    
         
     def close_connection(self):
         # Close the connection
         self.connect.close()
-        print("\n------------Database connection closed------------")
+        print("\n------------Database connection closed------------\n")
         
-def main():
-    # Main function for using the database using command line
-    db_file = "data/bookings.db"
+def main(db_file):
     booking_system = BookingSystem(db_file)
 
     try:
@@ -96,10 +116,19 @@ def main():
             choice = input("Enter your choice: ")
 
             if choice == "1":
-                customer_name = input("Enter customer name: ")
-                date = input("Enter booking date: ")
-                service = input("Enter service: ")
+                customer_name = input("\nEnter customer name: ").capitalize()
+                if not booking_system.validate_name(customer_name):
+                    print("\n------------Invalid customer name. Please use letters only------------\n")
+                    continue
+
+                date = input("\nEnter booking date (YYMMDD): ")
+                if not booking_system.validate_date(date):
+                    print("\n------------Invalid date format. Please use YYMMDD format------------\n")
+                    continue
+
+                service = input("\nEnter service: ").capitalize()
                 booking_system.make_booking(customer_name, date, service)
+                
             elif choice == "2":
                 booking_system.view_bookings()
             elif choice == "3":
@@ -108,13 +137,13 @@ def main():
             elif choice == "4":
                 break
             else:
-                print("\n------------Invalid choice. Please try again------------")
+                print("\n------------Invalid choice. Please try again------------\n")
    
     except Exception as e:
-        # Show error code
-        print(f"\n**********An error occurred: {str(e)}**********")
+        print(f"\n**********An error occurred: {str(e)}**********\n")
     finally:
         booking_system.close_connection()
 
 if __name__ == "__main__":
-    main()
+    db_file = "data/bookings.db"
+    main(db_file)
